@@ -1,0 +1,57 @@
+# Environment and Credentials
+.env
+*.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+.venv/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Vector Store and Uploaded User Data
+data/chroma/
+data/documents/*
+!data/documents/.gitkeep
+!data/documents/*.txt
+!data/documents/*.md
+!data/documents/*.pdf
+data/documents/aldwell_schachter_harmony_voice_leading.md
+data/metadata/evaluation_results.json
+data/metadata/documents.json
+data/metadata/lexical_index.json
+
+# Testing and coverage
+.pytest_cache/
+.coverage
+htmlcov/
+
+# IDE & OS
+.vscode/
+.idea/
+*.swp
+*.swo
+Thumbs.db
+Desktop.ini
+.DS_Store

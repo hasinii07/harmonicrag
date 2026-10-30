@@ -1,0 +1,633 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HarmonicRAG — Music Theory AI Chatbot</title>
+    <meta name="description" content="AI-powered music theory research assistant grounded in classical harmony treatises, textbooks, and educational materials using hybrid RAG and Google Gemini.">
+    
+    <!-- Google Fonts: Inter and Fira Code -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <!-- Application Stylesheet -->
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body class="theme-dark">
+    <div id="app" class="app-layout">
+        <!-- ============================================================== -->
+        <!-- SIDEBAR -->
+        <!-- ============================================================== -->
+        <aside id="sidebar" class="sidebar">
+            <div class="sidebar-header">
+                <div class="brand">
+                    <div class="brand-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M9 18V5l12-2v13"></path>
+                            <circle cx="6" cy="18" r="3"></circle>
+                            <circle cx="18" cy="16" r="3"></circle>
+                        </svg>
+                    </div>
+                    <div class="brand-text">
+                        <span class="brand-title">Harmonic<span class="brand-accent">RAG</span></span>
+                        <span class="brand-subtitle">Music Theory AI</span>
+                    </div>
+                </div>
+                <button id="btn-sidebar-toggle" class="icon-btn mobile-only" title="Toggle Sidebar">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"></path></svg>
+                </button>
+            </div>
+
+            <div class="sidebar-action">
+                <button id="btn-new-chat" class="btn btn-primary btn-block btn-new-chat">
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" class="btn-new-chat-icon"><path d="M12 5v14M5 12h14"></path></svg>
+                    <span>New Chat</span>
+                </button>
+            </div>
+
+            <!-- Main Navigation -->
+            <nav class="sidebar-nav">
+                <button id="nav-chat" class="nav-item active" data-view="chat">
+                    <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+                    <span>Theory Chat</span>
+                </button>
+                <button id="nav-documents" class="nav-item" data-view="documents">
+                    <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
+                    <span>Knowledge Base</span>
+                    <span id="badge-doc-count" class="badge">0</span>
+                </button>
+                <button id="nav-evaluation" class="nav-item" data-view="evaluation">
+                    <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 20V10M12 20V4M6 20v-6"></path></svg>
+                    <span>Evaluation Suite</span>
+                </button>
+            </nav>
+
+            <!-- Conversation History List -->
+            <div class="sidebar-history-section">
+                <div class="history-header">
+                    <span>Recent Discussions</span>
+                </div>
+                <div id="conversation-list" class="conversation-list">
+                    <!-- Populated dynamically -->
+                </div>
+            </div>
+
+            <!-- System Diagnostics Status -->
+            <div class="sidebar-footer">
+                <button id="btn-open-settings" class="btn-settings-toggle" title="Settings & Health">
+                    <div class="status-indicator-group">
+                        <span id="system-status-dot" class="status-dot status-ok"></span>
+                        <span id="system-status-text" class="status-label">Gemini: Configured</span>
+                    </div>
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" class="settings-gear-icon"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+                </button>
+            </div>
+        </aside>
+
+        <!-- ============================================================== -->
+        <!-- MAIN CONTENT CONTAINER -->
+        <!-- ============================================================== -->
+        <main class="main-content">
+            <!-- Mobile Topbar Header -->
+            <header class="topbar mobile-only">
+                <button id="btn-mobile-menu" class="icon-btn" title="Menu">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg>
+                </button>
+                <span class="topbar-title">Harmonic<span class="brand-accent">RAG</span></span>
+                <button id="btn-mobile-new" class="icon-btn" title="New Chat">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"></path></svg>
+                </button>
+            </header>
+
+            <!-- ---------------------------------------------------------- -->
+            <!-- VIEW 1: CHAT INTERFACE -->
+            <!-- ---------------------------------------------------------- -->
+            <section id="view-chat" class="view-panel active">
+                <!-- Chat Toolbar Header -->
+                <div class="chat-toolbar-header">
+                    <div class="chat-toolbar-title-wrap">
+                        <span class="chat-status-pulse"></span>
+                        <span class="chat-toolbar-topic">Harmonic Theory Assistant</span>
+                    </div>
+                    <div class="chat-toolbar-actions">
+                        <button id="btn-toolbar-visualizer" class="toolbar-btn btn-toolbar-visualizer" title="Toggle Interactive Theory Visualizer">
+                            <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" class="toolbar-btn-icon">
+                                <rect x="2" y="4" width="20" height="16" rx="2"></rect>
+                                <path d="M6 4v8M10 4v8M14 4v8M18 4v8"></path>
+                            </svg>
+                            <span>Music Visualizer</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="chat-viewport">
+                    <!-- Welcome Hero (shown when no messages) -->
+                    <div id="welcome-screen" class="welcome-screen">
+                        <div class="welcome-card">
+                            <div class="welcome-badge">Hybrid RAG & Gemini 2.5</div>
+                            <h1 class="welcome-heading">Evidence-Grounded Music Theory</h1>
+                            <p class="welcome-desc">
+                                Ask advanced questions on classical harmony, voice leading, scale theory, 
+                                figured bass, and musical form grounded in verified historical treatises.
+                            </p>
+                            
+                            <div class="example-grid-title">Suggested Inquiries</div>
+                            <div class="example-grid">
+                                <button class="example-card" data-question="What intervals construct a major triad, and what are its scale degrees?">
+                                    <span class="example-category">Scale & Chords</span>
+                                    <span class="example-text">What intervals construct a major triad, and what are its scale degrees?</span>
+                                </button>
+                                <button class="example-card" data-question="What is a Perfect Authentic Cadence (PAC) in classical harmony?">
+                                    <span class="example-category">Harmonic Cadences</span>
+                                    <span class="example-text">What is a Perfect Authentic Cadence (PAC) in classical harmony?</span>
+                                </button>
+                                <button class="example-card" data-question="Explain how the dominant seventh chord (V7) resolves in four-part SATB voice leading.">
+                                    <span class="example-category">Voice Leading</span>
+                                    <span class="example-text">Explain how the dominant seventh chord (V7) resolves in SATB part writing.</span>
+                                </button>
+                                <button class="example-card" data-question="Is 6/8 meter classified as having two beats or six beats?">
+                                    <span class="example-category">Rhythm & Meter</span>
+                                    <span class="example-text">Is 6/8 meter classified as having two beats or six beats?</span>
+                                </button>
+                                <button class="example-card" data-question="In classical SATB voice leading, why are parallel fifths allowed between voices?">
+                                    <span class="example-category">Misconception Check</span>
+                                    <span class="example-text">Why are parallel fifths allowed in classical voice leading?</span>
+                                </button>
+                                <button class="example-card" data-question="What is the structure of Binary Form (AB) vs Ternary Form (ABA) in instrumental music?">
+                                    <span class="example-category">Musical Form</span>
+                                    <span class="example-text">What is the structure of Binary Form vs Ternary Form?</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Messages Container -->
+                    <div id="messages-container" class="messages-container"></div>
+                </div>
+
+                <!-- Interactive Piano Drawer / Dock (Collapsed/Hidden by Default) -->
+                <div id="piano-panel" class="piano-panel hidden collapsed" data-state="closed" style="display: none;">
+                    <div class="piano-panel-header">
+                        <div class="piano-title-wrap">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="piano-icon">
+                                <rect x="2" y="4" width="20" height="16" rx="2"></rect>
+                                <path d="M6 4v8M10 4v8M14 4v8M18 4v8"></path>
+                            </svg>
+                            <span class="piano-title">Interactive Theory Visualizer & Synthesizer</span>
+                            <span id="piano-label" class="piano-active-label">No active chord selected</span>
+                        </div>
+                        <div class="piano-controls-wrap">
+                            <button id="btn-play-chord" class="btn btn-sm btn-secondary" title="Play simultaneous block chord">
+                                <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"></path></svg>
+                                <span>Play Chord</span>
+                            </button>
+                            <button id="btn-play-scale" class="btn btn-sm btn-secondary" title="Play ascending & descending scale">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 17l6-6 4 4 8-8"></path></svg>
+                                <span>Play Sequence</span>
+                            </button>
+                            <button id="btn-play-arpeggio" class="btn btn-sm btn-secondary" title="Play arpeggiated chord">
+                                <span>Arpeggio</span>
+                            </button>
+                            <button id="btn-stop-audio" class="btn btn-sm btn-outline" title="Stop Audio">
+                                <svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12"></rect></svg>
+                            </button>
+                            <div class="tempo-control">
+                                <label for="tempo-slider">BPM: <span id="tempo-val">120</span></label>
+                                <input type="range" id="tempo-slider" min="60" max="220" value="120">
+                            </div>
+                            <button id="btn-close-piano" class="icon-btn btn-close-piano" title="Close Visualizer">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                            </button>
+                            <button id="btn-toggle-piano" class="icon-btn hidden" title="Toggle Visualizer" style="display:none;">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 9l-7 7-7-7"></path></svg>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="piano-keyboard-container">
+                        <div id="piano-keys" class="piano-keys">
+                            <!-- Piano keys generated dynamically via piano.js -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Chat Input Section -->
+                <div class="chat-input-bar">
+                    <form id="chat-form" class="chat-form">
+                        <div class="input-wrapper">
+                            <textarea 
+                                id="chat-input" 
+                                class="chat-textarea" 
+                                placeholder="Ask a music theory question (e.g. cadence types, V7 resolution, SATB voice leading, interval calculations)..." 
+                                rows="1"
+                                autofocus
+                            ></textarea>
+                            <button type="submit" id="btn-send" class="btn-send" title="Send (Enter)">
+                                <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2">
+                                    <line x1="22" y1="2" x2="11" y2="13"></line>
+                                    <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                                </svg>
+                            </button>
+                        </div>
+                        <div class="input-footer-hint">
+                            <span>Press <strong>Enter</strong> to send, <strong>Shift+Enter</strong> for newline</span>
+                            <span class="hybrid-pill">Hybrid RAG: ChromaDB + BM25 + RRF</span>
+                        </div>
+                    </form>
+                </div>
+            </section>
+
+            <!-- ---------------------------------------------------------- -->
+            <!-- VIEW 2: KNOWLEDGE BASE & DOCUMENTS -->
+            <!-- ---------------------------------------------------------- -->
+            <section id="view-documents" class="view-panel">
+                <div class="panel-header">
+                    <div class="panel-title-group">
+                        <h2 class="panel-title">Knowledge Base & Ingestion</h2>
+                        <p class="panel-subtitle">Manage indexed textbooks, treatises, and instructional notes.</p>
+                    </div>
+                    <div class="panel-actions">
+                        <button id="btn-open-paste-modal" class="btn btn-secondary">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+                            <span>Paste Notes</span>
+                        </button>
+                        <button id="btn-trigger-upload" class="btn btn-primary">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                            <span>Upload Document</span>
+                        </button>
+                        <input type="file" id="file-upload-input" accept=".pdf,.md,.txt" style="display: none;">
+                    </div>
+                </div>
+
+                <!-- Metrics Overview -->
+                <div class="doc-stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-num" id="stat-doc-count">0</div>
+                        <div class="stat-label">Indexed Documents</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-num" id="stat-chunk-count">0</div>
+                        <div class="stat-label">Total Text Chunks</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-num">768</div>
+                        <div class="stat-label">Vector Dimensions</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-num" id="stat-vector-store">ChromaDB</div>
+                        <div class="stat-label">Cosine Distance Space</div>
+                    </div>
+                </div>
+
+                <!-- Upload Drag-Drop Dropzone -->
+                <div id="dropzone" class="dropzone">
+                    <div class="dropzone-content">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="dropzone-icon">
+                            <path d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
+                        </svg>
+                        <div class="dropzone-text">
+                            <strong>Drop PDF, Markdown, or TXT treatises here</strong>
+                            <span>or click to browse from your computer</span>
+                        </div>
+                        <span class="dropzone-hint">Supports up to 25MB • Preserves page numbers and headings for exact citations</span>
+                    </div>
+                </div>
+
+                <!-- Ingestion Progress / Alert Box -->
+                <div id="ingest-alert" class="ingest-alert hidden"></div>
+
+                <!-- Documents List Table -->
+                <div class="table-card">
+                    <div class="table-card-header">
+                        <h3>Indexed Document Registry</h3>
+                        <button id="btn-refresh-docs" class="icon-btn" title="Refresh Document List">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 4v6h-6M1 20v-6h6"></path><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+                        </button>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Document Title</th>
+                                    <th>Author</th>
+                                    <th>Format</th>
+                                    <th>Pages</th>
+                                    <th>Chunks</th>
+                                    <th>Status</th>
+                                    <th>Date Added</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="documents-table-body">
+                                <tr><td colspan="8" class="text-center py-4">Loading documents...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ---------------------------------------------------------- -->
+            <!-- VIEW 3: AUTOMATED EVALUATION SUITE -->
+            <!-- ---------------------------------------------------------- -->
+            <section id="view-evaluation" class="view-panel">
+                <div class="panel-header">
+                    <div class="panel-title-group">
+                        <h2 class="panel-title">Automated RAG Evaluation Suite</h2>
+                        <p class="panel-subtitle">Six-category benchmark validating factual grounding, citations, and abstention.</p>
+                    </div>
+                    <div class="panel-actions">
+                        <button id="btn-run-evaluation" class="btn btn-primary">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+                            <span id="eval-btn-label">Run Benchmark Suite</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Evaluation Metric Summary Cards -->
+                <div class="eval-metrics-grid">
+                    <div class="metric-card">
+                        <div class="metric-title">Pass Rate</div>
+                        <div class="metric-value" id="eval-pass-rate">--%</div>
+                        <div class="metric-sub" id="eval-pass-counts">0 / 0 tests</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-title">Retrieval Success</div>
+                        <div class="metric-value" id="eval-retrieval-rate">--%</div>
+                        <div class="metric-sub">Hybrid match accuracy</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-title">Citation Precision</div>
+                        <div class="metric-value" id="eval-citation-prec">--%</div>
+                        <div class="metric-sub">Verified against chunks</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-title">Citation Coverage</div>
+                        <div class="metric-value" id="eval-citation-cov">--%</div>
+                        <div class="metric-sub">Required citations supplied</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-title">Abstention Rate</div>
+                        <div class="metric-value" id="eval-abstain-rate">--%</div>
+                        <div class="metric-sub">Out-of-scope abstention</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-title">Average Latency</div>
+                        <div class="metric-value" id="eval-avg-latency">-- ms</div>
+                        <div class="metric-sub">Retrieval + synthesis</div>
+                    </div>
+                </div>
+
+                <!-- Category Filter Tabs -->
+                <div class="filter-tabs">
+                    <button class="filter-tab active" data-category="ALL">All Categories (12)</button>
+                    <button class="filter-tab" data-category="A">A: Direct In-Corpus</button>
+                    <button class="filter-tab" data-category="B">B: Multi-Passage</button>
+                    <button class="filter-tab" data-category="C">C: Out-of-Scope</button>
+                    <button class="filter-tab" data-category="D">D: Ambiguous</button>
+                    <button class="filter-tab" data-category="E">E: Misconceptions</button>
+                    <button class="filter-tab" data-category="F">F: Strict Citations</button>
+                </div>
+
+                <!-- Evaluation Cases Table -->
+                <div class="table-card">
+                    <div class="table-responsive">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Status</th>
+                                    <th>Test ID</th>
+                                    <th>Category</th>
+                                    <th>Question</th>
+                                    <th>Criteria</th>
+                                    <th>Citations</th>
+                                    <th>Latency</th>
+                                </tr>
+                            </thead>
+                            <tbody id="evaluation-table-body">
+                                <tr><td colspan="7" class="text-center py-4">Run the evaluation suite to view live benchmark metrics.</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- ============================================================== -->
+    <!-- SLIDE-OVER SOURCE PASSAGE DRAWER -->
+    <!-- ============================================================== -->
+    <div id="source-drawer" class="drawer-overlay hidden">
+        <div class="drawer-panel">
+            <div class="drawer-header">
+                <div>
+                    <h3 class="drawer-title">Retrieved Source Passage</h3>
+                    <span id="drawer-chunk-id" class="drawer-subtitle">Chunk ID</span>
+                </div>
+                <button id="btn-close-source-drawer" class="icon-btn">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"></path></svg>
+                </button>
+            </div>
+            <div class="drawer-body">
+                <div class="source-meta-card">
+                    <div class="meta-row">
+                        <span class="meta-label">Document:</span>
+                        <strong id="drawer-doc-title" class="meta-val">--</strong>
+                    </div>
+                    <div class="meta-row">
+                        <span class="meta-label">Author:</span>
+                        <span id="drawer-author" class="meta-val">--</span>
+                    </div>
+                    <div class="meta-row">
+                        <span class="meta-label">Page / Section:</span>
+                        <span id="drawer-page" class="meta-val">--</span>
+                    </div>
+                    <div class="meta-row">
+                        <span class="meta-label">Verification:</span>
+                        <span class="verified-badge">✓ Grounded in Document Store</span>
+                    </div>
+                </div>
+                <div class="source-content-block">
+                    <label class="block-label">Full Passage Text</label>
+                    <div id="drawer-content" class="passage-text"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============================================================== -->
+    <!-- RAG PIPELINE INSPECTOR MODAL -->
+    <!-- ============================================================== -->
+    <div id="inspector-modal" class="modal-backdrop hidden">
+        <div class="modal-dialog modal-xl">
+            <div class="modal-header">
+                <div class="modal-title-group">
+                    <div class="inspector-badge">RAG Audit Trail</div>
+                    <h3 class="modal-title">Retrieval Pipeline Inspector</h3>
+                </div>
+                <button id="btn-close-inspector" class="icon-btn">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"></path></svg>
+                </button>
+            </div>
+            <div class="modal-body">
+                <!-- Query Banner -->
+                <div class="inspector-query-banner">
+                    <span class="label">Query:</span>
+                    <strong id="insp-query">--</strong>
+                    <div class="tokens-pill">
+                        <span>Tokens: </span><code id="insp-tokens">--</code>
+                    </div>
+                </div>
+
+                <!-- Latency Pipeline Flow -->
+                <div class="latency-timeline">
+                    <div class="timeline-step">
+                        <div class="step-label">Dense Retrieval</div>
+                        <div class="step-time" id="insp-time-dense">0 ms</div>
+                        <div class="step-sub" id="insp-count-dense">0 results</div>
+                    </div>
+                    <div class="timeline-arrow">➔</div>
+                    <div class="timeline-step">
+                        <div class="step-label">BM25 Lexical</div>
+                        <div class="step-time" id="insp-time-lex">0 ms</div>
+                        <div class="step-sub" id="insp-count-lex">0 results</div>
+                    </div>
+                    <div class="timeline-arrow">➔</div>
+                    <div class="timeline-step">
+                        <div class="step-label">Rank Fusion (RRF)</div>
+                        <div class="step-time" id="insp-time-fuse">0 ms</div>
+                        <div class="step-sub" id="insp-count-fuse">k=60</div>
+                    </div>
+                    <div class="timeline-arrow">➔</div>
+                    <div class="timeline-step">
+                        <div class="step-label">Answer Generation</div>
+                        <div class="step-time" id="insp-time-gen">0 ms</div>
+                        <div class="step-sub">Gemini / Grounded</div>
+                    </div>
+                    <div class="timeline-arrow">➔</div>
+                    <div class="timeline-step total-step">
+                        <div class="step-label">Total Latency</div>
+                        <div class="step-time" id="insp-time-total">0 ms</div>
+                    </div>
+                </div>
+
+                <!-- Fused Results Table -->
+                <div class="inspector-section">
+                    <h4>Reciprocal Rank Fusion Results</h4>
+                    <div class="table-responsive">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Final Rank</th>
+                                    <th>Chunk ID</th>
+                                    <th>Document</th>
+                                    <th>Page</th>
+                                    <th>Dense Rank</th>
+                                    <th>Cosine Sim</th>
+                                    <th>BM25 Rank</th>
+                                    <th>BM25 Score</th>
+                                    <th>RRF Score</th>
+                                </tr>
+                            </thead>
+                            <tbody id="insp-fused-tbody"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Citation Validation Status -->
+                <div class="inspector-section">
+                    <h4>Citation Grounding & Verification</h4>
+                    <div id="insp-citation-summary" class="citation-audit-box"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============================================================== -->
+    <!-- PASTE TEXT NOTES MODAL -->
+    <!-- ============================================================== -->
+    <div id="paste-modal" class="modal-backdrop hidden">
+        <div class="modal-dialog">
+            <div class="modal-header">
+                <h3 class="modal-title">Ingest Notes or Treatise Excerpt</h3>
+                <button id="btn-close-paste" class="icon-btn">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"></path></svg>
+                </button>
+            </div>
+            <div class="modal-body">
+                <form id="paste-form">
+                    <div class="form-group">
+                        <label for="paste-title">Title / Treatise Name *</label>
+                        <input type="text" id="paste-title" class="form-input" placeholder="e.g. Counterpoint and Invertible Polyphony" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="paste-author">Author / Source</label>
+                        <input type="text" id="paste-author" class="form-input" placeholder="e.g. Johann Joseph Fux">
+                    </div>
+                    <div class="form-group">
+                        <label for="paste-content">Text / Markdown Content *</label>
+                        <textarea id="paste-content" class="form-textarea" rows="10" placeholder="Paste theoretical rules, chapter contents, or harmonic explanations here..." required></textarea>
+                    </div>
+                    <div class="form-actions">
+                        <button type="button" id="btn-cancel-paste" class="btn btn-outline">Cancel</button>
+                        <button type="submit" id="btn-submit-paste" class="btn btn-primary">Ingest into Knowledge Base</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============================================================== -->
+    <!-- SETTINGS & DIAGNOSTICS MODAL -->
+    <!-- ============================================================== -->
+    <div id="settings-modal" class="modal-backdrop hidden">
+        <div class="modal-dialog">
+            <div class="modal-header">
+                <h3 class="modal-title">System Settings & Configuration</h3>
+                <button id="btn-close-settings" class="icon-btn">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"></path></svg>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="settings-api-key">Google Gemini API Key</label>
+                    <input type="password" id="settings-api-key" class="form-input" placeholder="AIzaSy...">
+                    <small class="form-hint">Loaded from backend environment or set dynamically for live session testing.</small>
+                </div>
+                <div class="form-group">
+                    <label>Generative Model</label>
+                    <input type="text" id="settings-gen-model" class="form-input" value="gemini-2.5-flash" readonly>
+                </div>
+                <div class="form-group">
+                    <label>Embedding Model</label>
+                    <input type="text" id="settings-emb-model" class="form-input" value="text-embedding-004" readonly>
+                </div>
+                <div class="settings-grid">
+                    <div class="form-group">
+                        <label>Top-K Dense</label>
+                        <input type="number" id="settings-k-dense" class="form-input" value="8">
+                    </div>
+                    <div class="form-group">
+                        <label>Top-K Lexical</label>
+                        <input type="number" id="settings-k-lex" class="form-input" value="8">
+                    </div>
+                    <div class="form-group">
+                        <label>Top-K Final (RRF)</label>
+                        <input type="number" id="settings-k-final" class="form-input" value="5">
+                    </div>
+                </div>
+                <div class="form-actions">
+                    <button type="button" id="btn-save-settings" class="btn btn-primary">Save Settings</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="/js/piano.js"></script>
+    <script src="/js/inspector.js"></script>
+    <script src="/js/chat.js"></script>
+    <script src="/js/documents.js"></script>
+    <script src="/js/evaluation.js"></script>
+    <script src="/js/app.js"></script>
+</body>
+</html>
