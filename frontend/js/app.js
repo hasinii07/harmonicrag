@@ -102,7 +102,7 @@ class HarmonicApp {
         const statusText = document.getElementById("system-status-text");
 
         try {
-            const resp = await fetch("/api/health");
+            const resp = await fetch(window.harmonicRagApiUrl("/api/health"));
             if (!resp.ok) throw new Error("Health check failed");
             const data = await resp.json();
 
@@ -131,7 +131,7 @@ class HarmonicApp {
         if (!listContainer) return;
 
         try {
-            const resp = await fetch("/api/chat/conversations");
+            const resp = await fetch(window.harmonicRagApiUrl("/api/chat/conversations"));
             if (!resp.ok) return;
             const convs = await resp.json();
 
@@ -153,7 +153,7 @@ class HarmonicApp {
                     // Switch to chat
                     this.switchView("chat");
                     // Load conversation history
-                    const histResp = await fetch(`/api/chat/conversations/${c.conversation_id}`);
+                    const histResp = await fetch(window.harmonicRagApiUrl(`/api/chat/conversations/${c.conversation_id}`));
                     if (histResp.ok) {
                         const turns = await histResp.json();
                         const msgContainer = document.getElementById("messages-container");
@@ -174,7 +174,7 @@ class HarmonicApp {
 
                 item.querySelector(".history-del-btn").addEventListener("click", async (e) => {
                     e.stopPropagation();
-                    await fetch(`/api/chat/conversations/${c.conversation_id}`, { method: "DELETE" });
+                    await fetch(window.harmonicRagApiUrl(`/api/chat/conversations/${c.conversation_id}`), { method: "DELETE" });
                     this.loadConversations();
                 });
 

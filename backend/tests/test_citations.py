@@ -59,3 +59,33 @@ def test_citation_validation_rejects_hallucinated_chunk():
     # The fabricated chunk must be rejected
     assert summary["rejected_count"] == 1
     assert any("fabricated_chunk_99" in r["reason"] for r in summary["rejected_details"])
+
+
+def test_citation_validation_rejects_fabricated_quote():
+    chunk = Chunk(
+        chunk_id="real_chunk_quote",
+        document_id="doc_real",
+        document_title="Real Treatise",
+        content="A perfect cadence moves from dominant to tonic.",
+        chunk_index=0,
+        char_count=48
+    )
+    fused_item = FusedSearchResult(
+        chunk=chunk,
+        rrf_score=0.02,
+        final_rank=1
+    )
+
+    valid, summary = validate_and_filter_citations(
+        [{
+            "chunk_id": "real_chunk_quote",
+            "quoted_passage": "A perfect cadence resolves to a deceptive chord."
+        }],
+        [fused_item]
+    )
+
+    assert summary["rejected_count"] == 1
+    assert summary["precision"] == 0.0
+    assert "not present" in summary["rejected_details"][0]["reason"]
+    assert valid
+    assert valid[0].quoted_passage.startswith("A perfect cadence moves")

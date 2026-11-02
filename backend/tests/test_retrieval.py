@@ -49,3 +49,25 @@ def test_hybrid_retrieval_trace():
     assert "lexical_ms" in trace.latencies_ms
     assert "total_retrieval_ms" in trace.latencies_ms
     assert isinstance(results, list)
+
+
+def test_evidence_sufficiency_uses_cadence_requirements_across_retrieved_context():
+    results, trace = hybrid_retriever.retrieve(
+        "What are the requirements for a perfect authentic cadence?"
+    )
+
+    assert trace.is_evidence_sufficient is True
+    assert results
+    assert any("cadence" in result.chunk.content.lower() for result in results)
+
+
+def test_out_of_scope_filter_matches_complete_terms_only():
+    _, theory_trace = hybrid_retriever.retrieve(
+        "What are the requirements for a perfect authentic cadence?"
+    )
+    _, production_trace = hybrid_retriever.retrieve(
+        "How do I adjust EQ in Ableton Live?"
+    )
+
+    assert theory_trace.is_evidence_sufficient is True
+    assert production_trace.is_evidence_sufficient is False

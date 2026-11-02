@@ -1,7 +1,21 @@
 from pathlib import Path
 from typing import Optional
 import os
+import logging
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+logger = logging.getLogger(__name__)
+
+def _normalize_embedding_model(value: str) -> str:
+    if isinstance(value, str) and value.strip().lower() == "text-embedding-004":
+        logger.warning(
+            "GEMINI_EMBEDDING_MODEL=text-embedding-004 is no longer available; "
+            "using gemini-embedding-001. Re-embed the existing index before dense retrieval."
+        )
+        return "gemini-embedding-001"
+    return value
+
 
 # Base directories anchored to this file's physical location
 BASE_BACKEND_DIR = Path(__file__).resolve().parent.parent
@@ -43,6 +57,14 @@ class Settings(BaseSettings):
     GEMINI_MODEL: str = "gemini-3.8-flash"
     GEMINI_EMBEDDING_MODEL: str = "gemini-embedding-001"
     GEMINI_REQUEST_TIMEOUT_MS: int = 30000
+    CHROMA_COLLECTION_NAME: str = "harmonic_rag_chunks"
+    API_BASE_URL: str = ""
+    CORS_ALLOWED_ORIGINS: str = ""
+
+    @field_validator("GEMINI_EMBEDDING_MODEL", mode="before")
+    @classmethod
+    def replace_retired_embedding_model(cls, value: str) -> str:
+        return _normalize_embedding_model(value)
 
     # Storage Paths (configured values or defaults)
     CHROMA_PERSIST_DIRECTORY: str = str(CANONICAL_DATA_DIR / "chroma")
@@ -67,15 +89,43 @@ class Settings(BaseSettings):
     PORT: int = 8000
     DEBUG: bool = False
 
+    @field_validator("DEBUG", mode="before")
+    @classmethod
+    def parse_debug(cls, v: str | bool) -> bool:
+        """Coerce various environment representations to a boolean.
+        Accepts traditional truthy strings ("true", "1", "yes") and treats any
+        other non‑empty value (including the legacy "release" flag) as ``False``.
+        """
+        if isinstance(v, bool):
+            return v
+        if isinstance(v, str):
+            lowered = v.strip().lower()
+            if lowered in {"true", "1", "yes"}:
+                return True
+        # Anything else – including "release" or empty – is considered False
+        return False
+
     @property
     def api_key(self) -> Optional[str]:
-        """Returns GOOGLE_API_KEY or GEMINI_API_KEY or checks system env."""
+        """Prefer GEMINI_API_KEY while retaining legacy GOOGLE_API_KEY support."""
         return (
-            self.GOOGLE_API_KEY 
-            or self.GEMINI_API_KEY 
-            or os.getenv("GOOGLE_API_KEY") 
+            self.GEMINI_API_KEY
             or os.getenv("GEMINI_API_KEY")
+            or self.GOOGLE_API_KEY
+            or os.getenv("GOOGLE_API_KEY")
         )
+
+    @property
+    def api_base_url(self) -> str:
+        return self.API_BASE_URL.strip().rstrip("/")
+
+    @property
+    def cors_allowed_origins(self) -> list[str]:
+        return [
+            origin.strip().rstrip("/")
+            for origin in self.CORS_ALLOWED_ORIGINS.split(",")
+            if origin.strip()
+        ]
 
     @property
     def project_root(self) -> Path:

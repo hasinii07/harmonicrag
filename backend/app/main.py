@@ -1,9 +1,11 @@
 import logging
+import json
 from pathlib import Path
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
 
 from app.config import settings
 from app.api.health import router as health_router
@@ -30,7 +32,7 @@ def log_startup_diagnostics():
     doc_files_on_disk = len(list(settings.documents_dir.glob("*.*"))) if settings.documents_dir.exists() else 0
     embed_info = embedding_service.get_model_info()
     api_key_configured = bool(settings.api_key and settings.api_key.strip())
-    gemini_key_status = f"CONFIGURED ({len(settings.api_key.strip())} chars, hidden)" if api_key_configured else "NOT CONFIGURED (offline fallback)"
+    gemini_key_status = "CONFIGURED (value hidden)" if api_key_configured else "NOT CONFIGURED (offline fallback)"
 
     banner = [
         "=" * 72,
@@ -45,6 +47,7 @@ def log_startup_diagnostics():
         f"  ChromaDB Collection:    {coll_name}",
         f"  Vector Chunks Indexed:  {chroma_count} chunks",
         f"  BM25 Lexical Chunks:    {lexical_count} chunks",
+        f"  Embedding Compatibility: {'OK' if vector_store.embedding_compatible else 'MIGRATION REQUIRED'}",
         f"  Index Parity:           {'OK (Consistent)' if chroma_count == lexical_count and chroma_count > 0 else 'WARNING: Mismatch or empty'}",
         "-" * 72,
         f"  Registered Documents:   {doc_count} documents in registry",
@@ -72,11 +75,29 @@ app = FastAPI(
     lifespan=lifespan
 )
 
+if settings.cors_allowed_origins:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=settings.cors_allowed_origins,
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+
 # Register API routers FIRST so they are not caught by static file catch-alls
 app.include_router(health_router)
 app.include_router(chat_router)
 app.include_router(documents_router)
 app.include_router(evaluation_router)
+
+@app.get("/api/config.js", include_in_schema=False)
+def serve_frontend_config() -> Response:
+    api_base_url = json.dumps(settings.api_base_url).replace("<", "\\u003c")
+    return Response(
+        content=f"window.HARMONICRAG_API_BASE_URL = {api_base_url};",
+        media_type="application/javascript",
+        headers={"Cache-Control": "no-store"},
+    )
 
 # Serve Frontend static assets
 frontend_path = settings.frontend_dir

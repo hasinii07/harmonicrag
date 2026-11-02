@@ -13,6 +13,11 @@ from app.rag.vector_store import vector_store
 def main() -> None:
     vector_count = vector_store.get_total_chunks_count()
     if vector_count:
+        if not vector_store.embedding_compatible:
+            raise RuntimeError(
+                "The existing ChromaDB collection uses an unknown or incompatible embedding space. "
+                "Run scripts/migrate_embedding_index.py before using this knowledge base."
+            )
         lexical_count = len(lexical_index.corpus_chunk_ids)
         if vector_count != lexical_count:
             raise RuntimeError(

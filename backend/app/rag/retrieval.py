@@ -23,6 +23,12 @@ OUT_OF_SCOPE_TERMS = [
     "serum", "massive", "audio interface", "midi controller"
 ]
 
+EVIDENCE_QUERY_FRAMING_TERMS = MUSIC_QUERY_STOPWORDS | {
+    "requirements", "requirement", "conditions", "condition", "criteria",
+    "notes", "make", "up", "list", "describe", "definition", "mean",
+    "meaning", "explain", "tell", "me", "about", "does"
+}
+
 def analyze_and_expand_query(query: str) -> Tuple[str, Optional[str], Optional[str]]:
     """
     Analyzes music theory query semantics, detects ambiguities, and provides
@@ -141,7 +147,10 @@ class HybridRetriever:
         q_lower = query.lower()
 
         # Check for explicitly uncovered/out-of-scope subjects
-        is_explicitly_out_of_scope = any(t in q_lower for t in OUT_OF_SCOPE_TERMS)
+        is_explicitly_out_of_scope = any(
+            re.search(rf"(?<!\w){re.escape(term)}(?!\w)", q_lower)
+            for term in OUT_OF_SCOPE_TERMS
+        )
 
         # 2. Dense retrieval
         t_dense_start = time.perf_counter()
@@ -168,10 +177,18 @@ class HybridRetriever:
         total_retrieval_ms = (time.perf_counter() - start_total) * 1000
 
         # 5. Evidence sufficiency evaluation and topical filtering
-        query_content_tokens = [t for t in tokenize_music_theory(query) if t not in MUSIC_QUERY_STOPWORDS]
+        query_content_tokens = [
+            token for token in tokenize_music_theory(query)
+            if token not in EVIDENCE_QUERY_FRAMING_TERMS
+        ]
         if query_content_tokens and raw_fused_results:
-            top_content = (raw_fused_results[0].chunk.content + " " + raw_fused_results[0].chunk.document_title).lower()
-            matched_tokens = [t for t in query_content_tokens if t in top_content]
+            evidence_context = " ".join(
+                f"{result.chunk.document_title} {result.chunk.content}"
+                for result in raw_fused_results[:3]
+            ).lower()
+            matched_tokens = [
+                token for token in query_content_tokens if token in evidence_context
+            ]
             match_ratio = len(matched_tokens) / len(query_content_tokens)
         else:
             match_ratio = 0.0

@@ -15,6 +15,77 @@ from app.rag.citations import validate_and_filter_citations
 
 logger = logging.getLogger(__name__)
 
+def _classify_gemini_error(error: Exception) -> str:
+    http_status = getattr(error, "code", None)
+    provider_status = getattr(error, "status", None)
+    detail = " ".join(
+        str(value or "") for value in (getattr(error, "message", None), error)
+    ).upper()
+    if str(http_status) == "429" or str(provider_status) == "RESOURCE_EXHAUSTED" or any(
+        term in detail for term in ("RESOURCE_EXHAUSTED", "QUOTA")
+    ):
+        return "quota_exhausted"
+    if str(http_status) == "404" or any(
+        term in detail for term in ("NOT_FOUND", "MODEL NOT FOUND", "UNKNOWN MODEL")
+    ):
+        return "model_unavailable"
+    if str(http_status) in {"401", "403"} or any(
+        term in detail for term in ("API_KEY_INVALID", "INVALID API KEY", "UNAUTHENTICATED")
+    ):
+        return "invalid_credentials"
+    if str(http_status) in {"408", "500", "502", "503", "504"} or str(
+        provider_status
+    ) in {"DEADLINE_EXCEEDED", "UNAVAILABLE", "INTERNAL", "ABORTED"}:
+        return "transient_provider_error"
+    if isinstance(error, (TimeoutError, ConnectionError, OSError)) or any(
+        term in type(error).__name__.lower()
+        for term in ("timeout", "connection", "connect", "network")
+    ):
+        return "network_error"
+    return "other_api_failure"
+
+
+def _safe_gemini_error_detail(error: Exception, api_key: Optional[str]) -> str:
+    detail = str(getattr(error, "message", None) or error)
+    if api_key:
+        detail = detail.replace(api_key, "[redacted]")
+    detail = re.sub(r"(?i)AIza[0-9A-Za-z_-]{20,}", "[redacted]", detail)
+    detail = re.sub(r"(?i)Bearer\s+\S+", "Bearer [redacted]", detail)
+    detail = re.sub(
+        r"(?i)(api[_-]?key|authorization)([=: ]+)\S+",
+        r"\1\2[redacted]",
+        detail,
+    )
+    return " ".join(detail.split())[:500]
+
+
+def _log_gemini_error(action: str, error: Exception, category: str, api_key: Optional[str]) -> None:
+    logger.warning(
+        "Gemini %s failed: exception_class=%s http_status=%s provider_status=%s "
+        "category=%s detail=%s",
+        action,
+        type(error).__name__,
+        getattr(error, "code", None),
+        getattr(error, "status", None),
+        category,
+        _safe_gemini_error_detail(error, api_key),
+    )
+
+
+_GEMINI_DIAGNOSTIC_MESSAGES = {
+    "invalid_credentials": "Gemini rejected the configured credentials.",
+    "model_unavailable": "The configured model is unavailable to this API key.",
+    "quota_exhausted": "Gemini API quota or rate limit has been reached.",
+    "network_error": "Could not reach the Gemini API due to a network error.",
+    "transient_provider_error": "Gemini is temporarily unavailable or timed out. Please try again later.",
+    "other_api_failure": "Gemini returned an API error; details were omitted.",
+}
+
+
+class GeminiGenerationUnavailableError(RuntimeError):
+    """Raised when a configured Gemini generation request cannot be completed."""
+
+
 SYSTEM_INSTRUCTION = """You are HarmonicRAG, a precise music theory research assistant.
 CRITICAL INSTRUCTIONS FOR GROUNDING AND ANSWER GENERATION:
 1. Always answer the user's actual question first directly and concisely in direct_answer.
@@ -195,6 +266,8 @@ class GeminiAnswerGenerator:
         self.model_name = model_name or settings.GEMINI_MODEL
         self.client = None
         self.is_live = False
+        self.client_initialization_error: Optional[Exception] = None
+        self.last_connection_test: Optional[Dict[str, Any]] = None
 
         if is_live is not None:
             self.is_live = is_live
@@ -207,8 +280,77 @@ class GeminiAnswerGenerator:
                 )
                 logger.info(f"Configured Google Gen AI generation client with model: {self.model_name}")
             except Exception as e:
-                logger.warning(f"Could not configure Google Gen AI generation client ({e}). Enabling deterministic grounded fallback.")
+                self.client_initialization_error = e
+                logger.warning(
+                    "Could not initialize the Google Gen AI generation client (category=%s).",
+                    _classify_gemini_error(e),
+                )
                 self.client = None
+
+    def diagnose_connection(self) -> Dict[str, Any]:
+        """Make one minimal generation request when explicitly invoked."""
+        configured = bool(self.api_key and isinstance(self.api_key, str) and self.api_key.strip())
+        result: Dict[str, Any] = {
+            "configured": configured,
+            "tested": False,
+            "success": False,
+            "category": "not_configured" if not configured else "not_tested",
+            "model": self.model_name,
+            "http_status": None,
+            "message": "Configure GEMINI_API_KEY before testing the Gemini connection."
+            if not configured else "Gemini connection has not been tested.",
+        }
+        if not configured:
+            self.last_connection_test = result
+            return result
+        tested = self.client is not None
+        diagnostic_error: Optional[Exception] = None
+        if self.client is None:
+            diagnostic_error = self.client_initialization_error or RuntimeError(
+                "Client initialization failed."
+            )
+            category = _classify_gemini_error(diagnostic_error)
+        else:
+            try:
+                response = self.client.models.generate_content(
+                    model=self.model_name,
+                    contents="Reply with OK.",
+                    config={"max_output_tokens": 8},
+                )
+                if not response or not response.text:
+                    category = "other_api_failure"
+                    diagnostic_error = RuntimeError("Gemini returned an empty response.")
+                else:
+                    result.update(
+                        tested=True,
+                        success=True,
+                        category="ok",
+                        message="Gemini API request succeeded.",
+                    )
+                    self.last_connection_test = result
+                    logger.info("Gemini connection diagnostic succeeded for configured model.")
+                    return result
+            except Exception as error:
+                category = _classify_gemini_error(error)
+                result["http_status"] = getattr(error, "code", None)
+                diagnostic_error = error
+        result.update(
+            tested=tested,
+            category=category,
+            message=(
+                "Gemini client could not be initialized."
+                if not tested else _GEMINI_DIAGNOSTIC_MESSAGES[category]
+            ),
+        )
+        if tested and diagnostic_error is not None:
+            self.last_connection_test = result
+            _log_gemini_error(
+                "connection diagnostic",
+                diagnostic_error,
+                category,
+                self.api_key,
+            )
+        return result
 
     def generate_answer(
         self,
@@ -250,14 +392,50 @@ class GeminiAnswerGenerator:
                     config={
                         "system_instruction": SYSTEM_INSTRUCTION,
                         "temperature": 0.2,
-                        "response_mime_type": "application/json"
+                        "response_mime_type": "application/json",
+                        "thinking_config": {"thinking_level": "LOW"},
+                        "max_output_tokens": 2048,
                     }
                 )
                 if response and response.text:
                     live_result = json.loads(response.text)
                     self.is_live = True
             except Exception as e:
-                logger.error(f"Live Gemini generation failed: {e}. Falling back to internal grounded synthesizer.")
+                error_category = _classify_gemini_error(e)
+                _log_gemini_error(
+                    "generation request",
+                    e,
+                    error_category,
+                    self.api_key,
+                )
+                if error_category == "quota_exhausted":
+                    quota_message = (
+                        "Gemini API quota or rate limit has been reached. "
+                        "Check your Google AI quota and billing, then try again later."
+                    )
+                    if is_evidence_sufficient:
+                        return self._build_retrieval_only_response(
+                            retrieved_results=retrieved_results,
+                            trace=trace,
+                            conversation_id=conversation_id,
+                            start_gen=start_gen,
+                        )
+                    raise GeminiGenerationUnavailableError(
+                        f"{quota_message} Retrieved evidence is insufficient to provide a reliable answer."
+                    ) from e
+                else:
+                    message = (
+                        _GEMINI_DIAGNOSTIC_MESSAGES[error_category]
+                        if error_category in _GEMINI_DIAGNOSTIC_MESSAGES
+                        else "Gemini answer generation is currently unavailable. Please try again later."
+                    )
+                    raise GeminiGenerationUnavailableError(
+                        message
+                    ) from e
+        elif self.api_key and isinstance(self.api_key, str) and self.api_key.strip():
+            raise GeminiGenerationUnavailableError(
+                "Gemini answer generation client could not be initialized."
+            ) from self.client_initialization_error
 
         gen_ms = (time.perf_counter() - start_gen) * 1000
         trace.latencies_ms["generation_ms"] = round(gen_ms, 2)
@@ -315,6 +493,46 @@ class GeminiAnswerGenerator:
             citations=valid_citations if is_evidence_sufficient else [],
             visualizer=visualizer_data,
             retrieval_trace=trace
+        )
+
+    def _build_retrieval_only_response(
+        self,
+        retrieved_results: List[FusedSearchResult],
+        trace: RetrievalTrace,
+        conversation_id: str,
+        start_gen: float,
+    ) -> ChatResponse:
+        cited_results = retrieved_results[:3]
+        candidate_citations = [
+            {
+                "chunk_id": result.chunk.chunk_id,
+                "quoted_passage": result.chunk.content,
+            }
+            for result in cited_results
+        ]
+        citations, validation = validate_and_filter_citations(
+            candidate_citations,
+            retrieved_results,
+            is_evidence_sufficient=True,
+        )
+        trace.citation_validation = validation
+        generation_ms = (time.perf_counter() - start_gen) * 1000
+        trace.latencies_ms["generation_ms"] = round(generation_ms, 2)
+        trace.latencies_ms["total_ms"] = round(
+            trace.latencies_ms.get("total_retrieval_ms", 0.0) + generation_ms,
+            2,
+        )
+
+        return ChatResponse(
+            conversation_id=conversation_id,
+            direct_answer="Retrieval-only response (Gemini quota exhausted).",
+            explanation="\n\n---\n\n".join(
+                result.chunk.content for result in cited_results
+            ),
+            is_evidence_sufficient=True,
+            knowledge_source="retrieval_only",
+            citations=citations,
+            retrieval_trace=trace,
         )
 
     def _synthesize_grounded_response(

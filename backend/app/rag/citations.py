@@ -44,12 +44,16 @@ def validate_and_filter_citations(
 
         chunk = retrieved_map[chunk_id]
 
-        # Check 2: Verifiable quote check (must be a realistic snippet from the chunk content)
+        # Check 2: Candidate quotes must be verbatim evidence from the referenced chunk.
         if quoted_passage:
-            norm_quote = " ".join(quoted_passage.lower().split()[:10])
-            norm_content = " ".join(chunk.content.lower().split())
-            if norm_quote not in norm_content and len(quoted_passage) > 30:
-                logger.warning(f"Quoted passage slightly differs from chunk text for {chunk_id}")
+            norm_quote = " ".join(quoted_passage.casefold().split())
+            norm_content = " ".join(chunk.content.casefold().split())
+            if norm_quote not in norm_content:
+                rejected_citations.append({
+                    "candidate": candidate,
+                    "reason": f"Quoted passage was not present in retrieved chunk '{chunk_id}'."
+                })
+                continue
 
         # Construct guaranteed verified citation from actual chunk metadata
         valid_citations.append(CitationRef(
@@ -80,11 +84,13 @@ def validate_and_filter_citations(
             ))
 
     total_candidates = len(candidate_citations)
-    precision = (len(valid_citations) / total_candidates) if total_candidates > 0 else 1.0
+    verified_candidates = total_candidates - len(rejected_citations)
+    precision = (verified_candidates / total_candidates) if total_candidates > 0 else 1.0
 
     validation_summary = {
         "candidate_count": total_candidates,
         "verified_count": len(valid_citations),
+        "verified_candidate_count": verified_candidates,
         "rejected_count": len(rejected_citations),
         "precision": round(precision, 4),
         "rejected_details": rejected_citations

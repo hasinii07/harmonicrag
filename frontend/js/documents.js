@@ -84,7 +84,7 @@ class DocumentManager {
 
     async loadDocuments() {
         try {
-            const resp = await fetch("/api/documents");
+            const resp = await fetch(window.harmonicRagApiUrl("/api/documents"));
             if (!resp.ok) throw new Error("Failed to load documents");
             const data = await resp.json();
 
@@ -150,7 +150,7 @@ class DocumentManager {
         this.showAlert(`Ingesting ${file.name}... Extracting text, preserving pages, and generating embeddings.`, "info");
 
         try {
-            const resp = await fetch("/api/documents/upload", {
+            const resp = await fetch(window.harmonicRagApiUrl("/api/documents/upload"), {
                 method: "POST",
                 body: formData
             });
@@ -179,7 +179,7 @@ class DocumentManager {
 
         this.showAlert(`Ingesting text notes "${title}"...`, "info");
         try {
-            const resp = await fetch("/api/documents/text", {
+            const resp = await fetch(window.harmonicRagApiUrl("/api/documents/text"), {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ title, author, content })
@@ -204,7 +204,7 @@ class DocumentManager {
         if (!confirm(`Are you sure you want to delete document ${docId} and purge all its indexed vectors?`)) return;
 
         try {
-            const resp = await fetch(`/api/documents/${docId}`, { method: "DELETE" });
+            const resp = await fetch(window.harmonicRagApiUrl(`/api/documents/${docId}`), { method: "DELETE" });
             if (!resp.ok) throw new Error("Delete failed");
             this.showAlert(`Document ${docId} removed from knowledge base.`, "success");
             this.loadDocuments();
@@ -215,7 +215,7 @@ class DocumentManager {
 
     async reindexDoc(docId) {
         try {
-            const resp = await fetch(`/api/documents/${docId}/reindex`, { method: "POST" });
+            const resp = await fetch(window.harmonicRagApiUrl(`/api/documents/${docId}/reindex`), { method: "POST" });
             if (!resp.ok) throw new Error("Re-index failed");
             this.showAlert(`Document ${docId} successfully re-indexed into ChromaDB and BM25.`, "success");
             this.loadDocuments();

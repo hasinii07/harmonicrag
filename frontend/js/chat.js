@@ -113,7 +113,7 @@ class ChatController {
         this.btnSend.disabled = true;
 
         try {
-            const response = await fetch("/api/chat", {
+            const response = await fetch(window.harmonicRagApiUrl("/api/chat"), {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
@@ -214,12 +214,16 @@ class ChatController {
 
         // Action Buttons
         const hasVisualizer = !!data.visualizer;
+        const responseModeLabel = data.knowledge_source === "retrieval_only"
+            ? '<div class="citation-label">Retrieval-only response · verbatim knowledge-base passages</div>'
+            : "";
         row.innerHTML = `
             <div class="message-avatar">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></svg>
             </div>
             <div class="message-bubble">
                 ${misconceptionHTML}
+                ${responseModeLabel}
                 <div class="message-direct-answer">${this.escapeHTML(data.direct_answer)}</div>
                 <div class="message-explanation">${this.formatMarkdown(data.explanation)}</div>
                 ${exampleHTML}

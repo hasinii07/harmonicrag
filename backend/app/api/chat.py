@@ -2,6 +2,7 @@ import logging
 from fastapi import APIRouter, HTTPException
 from typing import List, Dict, Any
 from app.models.schemas import ChatRequest, ChatResponse
+from app.rag.generation import GeminiGenerationUnavailableError
 from app.services.chat_service import chat_service
 
 router = APIRouter(prefix="/api/chat", tags=["Chat"])
@@ -19,6 +20,8 @@ def post_chat_message(request: ChatRequest) -> ChatResponse:
     """
     try:
         return chat_service.process_message(request)
+    except GeminiGenerationUnavailableError as error:
+        raise HTTPException(status_code=503, detail=str(error)) from error
     except ValueError as ve:
         raise HTTPException(status_code=400, detail=str(ve))
     except Exception:

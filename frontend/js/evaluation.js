@@ -34,7 +34,7 @@ class EvaluationController {
 
     async loadLatestResults() {
         try {
-            const resp = await fetch("/api/evaluation/results");
+            const resp = await fetch(window.harmonicRagApiUrl("/api/evaluation/results"));
             if (!resp.ok) return;
             const data = await resp.json();
             this.currentReport = data;
@@ -50,7 +50,7 @@ class EvaluationController {
         if (this.btnLabel) this.btnLabel.textContent = "Executing 12 Benchmark Tests...";
 
         try {
-            const resp = await fetch("/api/evaluation/run", { method: "POST" });
+            const resp = await fetch(window.harmonicRagApiUrl("/api/evaluation/run"), { method: "POST" });
             if (!resp.ok) {
                 const err = await resp.json().catch(() => ({}));
                 throw new Error(err.detail || "Evaluation execution failed");

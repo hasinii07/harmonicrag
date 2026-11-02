@@ -41,6 +41,7 @@ data/documents/aldwell_schachter_harmony_voice_leading.md
 data/metadata/evaluation_results.json
 data/metadata/documents.json
 data/metadata/lexical_index.json
+data/metadata/embedding_index_registry.json
 
 # Testing and coverage
 .pytest_cache/
